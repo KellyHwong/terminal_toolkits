@@ -1,9 +1,13 @@
-# Project All With Terminal (maybe we should come up with another name with more beauty)
+# Termiinal Toolkits
+
+**terminal_toolkits**
+
+renamed from `Project-All-With-Terminal`.
 
 # simple
 
 ```bash
-git clone https://github.com/KellyHwong/Project-All-With-Terminal
+git clone https://github.com/KellyHwong/terminal_toolkits
 # TODO create a no dist branch for speed up
 cp simple.bash ~
 cd ~
@@ -71,9 +75,9 @@ ctrl shift alt 上下左右 带着当前窗口一起切换工作区（Windows 10
 
 反正 aria2c 安装好了，解压，配置路径就可以，没有注册表之类冗余的东东，很干净。
 
-使用：  
-1.
-命令行输入以下命令即可：
+使用：
+
+1.  命令行输入以下命令即可：
 
 ```
 aria2c --conf-path="C:\Program Files\aria2-1.34.0-win-64bit-build1\aria2.conf"
