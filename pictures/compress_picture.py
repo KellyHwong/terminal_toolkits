@@ -6,8 +6,9 @@
 # @RefLink : https://pillow.readthedocs.io/en/5.1.x/handbook/image-file-formats.html
 
 from PIL import Image
-import cv2
+# import cv2
 import os
+import glob
 import piexif
 import shutil
 from tqdm import tqdm
@@ -41,52 +42,89 @@ def different_qualities(png_path):
 
 
 def copy_stat(src, dest):
-    from win32_setctime import setctime
     stat_origin = os.stat(src)
     # Set atime and mtime
     os.utime(dest, (stat_origin.st_atime, stat_origin.st_mtime))
+
     # Set ctime
-    setctime(dest, stat_origin.st_ctime)
+    import platform
+    sys = platform.system()
+    if sys == "Windows":
+        from win32_setctime import setctime
+        setctime(dest, stat_origin.st_ctime)
+    elif sys == "Darwin":
+        # Still cannot set ctime on Mac platform
+        # See: https://stackoverflow.com/questions/56008797/how-to-change-the-creation-date-of-file-using-python-on-a-mac
+        pass
 
 
 def main():
-    png_dir = "D:\\原神截图"
-    out_dir = "D:\\原神截图_out"
-    exif_dir = "D:\\原神截图_exif"
+    # Prepare directories
+    png_dir = "/Users/HuangKan/Downloads/原神截图Mac"
+    out_dir = "/Users/HuangKan/Downloads/原神截图Mac_out"
+    exif_dir = "/Users/HuangKan/Downloads/原神截图Mac_exif"
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(exif_dir, exist_ok=True)
 
+    # Set quality
     quality = 95
 
-    png_files = os.listdir(png_dir)
-    png_files = [f for f in png_files if os.path.splitext(f)[-1] == ".png"]
-    print(f"Number of PNG files: {len(png_files)}.")
-    # png_path = "AI_2021-02-24-10-18-13-646.png"
-    for png_file in png_files:
-        image = Image.open(os.path.join(png_dir, png_file))
+    png_paths = glob.glob(os.path.join(png_dir, "*.png"))\
+        + glob.glob(os.path.join(png_dir, "*.PNG"))
+    print(f"Number of PNG files: {len(png_paths)}.")
+
+    # Run here firstly, to split png files with and without EXIF info
+    for png_file in tqdm(png_paths):
+        image = Image.open(png_file)
         # Try to load EXIF info
         exif_dict = None
         try:
             exif_dict = piexif.load(image.info["exif"])
-            # print(exif_dict)
+            # print("got exif_dict!")
         except:
-            # KeyError: 'exif'
             # print("KeyError: 'exif', no EXIF info found.")
             pass
         if exif_dict:
             image.close()
-            shutil.move(os.path.join(png_dir, png_file),
-                        os.path.join(exif_dir, png_file))
-            png_files.remove(png_file)
 
-    for png_file in tqdm(png_files):
-        jpg_file = f"{os.path.splitext(png_file)[0]}-quality-{quality}.jpg"
-        png2jpg(os.path.join(png_dir, png_file),
-                os.path.join(out_dir, jpg_file), quality=quality)
-        copy_stat(os.path.join(png_dir, png_file),
-                  os.path.join(out_dir, jpg_file))
-        # Warning! 警告！这里会删除原文件。
-        os.remove(os.path.join(png_dir, png_file))
+            def move_exif_file(src, dest_dir):
+                dest = os.path.join(dest_dir, os.path.split(png_file)[1])
+                print(f"Moving file from {src} to {dest}")
+                shutil.move(src, dest)
+                return dest
+
+            move_exif_file(png_file, exif_dir)
+
+    # Compress png files without EXIF to jpg
+    png_paths = glob.glob(os.path.join(png_dir, "*.png"))\
+        + glob.glob(os.path.join(png_dir, "*.PNG"))
+    # png_paths = [f for f in png_paths if os.path.splitext(f)[-1] == ".png"]
+    print(f"Number of PNG files without EXIF: {len(png_paths)}.")
+
+    for png_path in tqdm(png_paths):
+        jpg_path = f"{os.path.splitext(png_path)[0]}-quality-{quality}.jpg"
+        jpg_path = os.path.join(out_dir, os.path.split(jpg_path)[1])
+        jpg_path = png2jpg(png_path, jpg_path, quality=quality)
+        copy_stat(png_path, jpg_path)
+        os.remove(png_path)  # Warning! 警告！这里会删除原文件。
+
+    # Compress png files with EXIF to jpg
+    png_paths = glob.glob(os.path.join(exif_dir, "*.png"))\
+        + glob.glob(os.path.join(exif_dir, "*.PNG"))
+    # png_paths = [f for f in png_paths if os.path.splitext(f)[-1] == ".png"]
+    print(f"Number of PNG files with EXIF: {len(png_paths)}.")
+
+    for png_path in tqdm(png_paths):
+        jpg_path = f"{os.path.splitext(png_path)[0]}-quality-{quality}.jpg"
+        jpg_path = os.path.join(out_dir, os.path.split(jpg_path)[1])
+        jpg_path = png2jpg(png_path, jpg_path, quality=quality)
+        copy_stat(png_path, jpg_path)
+
+        image = Image.open(png_path)  # copy png file's EXIF info to jpg file
+        exif_dict = piexif.load(image.info["exif"])
+        exif_bytes = piexif.dump(exif_dict)
+        piexif.insert(exif_bytes, jpg_path)
+        os.remove(png_path)  # Warning! 警告！这里会删除原文件。
 
 
 if __name__ == "__main__":
